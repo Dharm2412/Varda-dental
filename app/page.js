@@ -1,6 +1,98 @@
+"use client";
 import Image from "next/image";
+import { useState, useEffect } from "react";
+import supabase from "./config/supabaseClient";
 
 export default function Home() {
+  // Add these states at the top of your component
+  const [form, setForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    service: "",
+    message: "",
+  });
+  const [status, setStatus] = useState("");
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+    
+    // Debug Supabase connection
+    if (supabase) {
+      console.log('🔗 Supabase client is available');
+      console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Configured' : 'Not configured');
+    } else {
+      console.warn('⚠️ Supabase client is not available');
+      console.log('Environment variables:');
+      console.log('- NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Not set');
+      console.log('- NEXT_PUBLIC_ANON_KEY:', process.env.NEXT_PUBLIC_ANON_KEY ? 'Set' : 'Not set');
+    }
+  }, []);
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setStatus("Sending...");
+    
+    try {
+      // Store data in Supabase if available
+      if (supabase) {
+        console.log('Attempting to store data in Supabase...');
+        console.log('Form data:', {
+          first_name: form.firstName,
+          last_name: form.lastName,
+          email: form.email,
+          phone: form.phone,
+          service: form.service,
+          message: form.message
+        });
+        
+        const { data, error } = await supabase
+          .from('appointments')
+          .insert([
+            {
+              first_name: form.firstName,
+              last_name: form.lastName,
+              email: form.email,
+              phone: form.phone,
+              service: form.service,
+              message: form.message,
+              created_at: new Date().toISOString()
+            }
+          ]);
+        
+        if (error) {
+          console.error('Supabase error:', error);
+          console.error('Error details:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          });
+          setStatus("Database error. Please try again.");
+          return;
+        }
+        
+        // Success - data stored in Supabase
+        console.log('✅ Data successfully stored in Supabase!');
+        console.log('Stored data:', data);
+        setStatus("Appointment booked! We'll contact you soon.");
+        setForm({ firstName: "", lastName: "", email: "", phone: "", service: "", message: "" });
+      } else {
+        console.warn('⚠️ Supabase client not available');
+        setStatus("Database not configured. Please contact us directly.");
+      }
+    } catch (error) {
+      console.error('Form submission error:', error);
+      setStatus("Something went wrong. Please try again.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
@@ -470,48 +562,28 @@ export default function Home() {
             
             <div className="bg-white p-8 rounded-lg shadow-xl">
               <h3 className="text-2xl font-semibold text-gray-900 mb-6">Book Your Appointment</h3>
-              <form className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input
-                    type="text"
-                    placeholder="First Name"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 text-gray-900 placeholder-gray-500 bg-white"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Last Name"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 text-gray-900 placeholder-gray-500 bg-white"
-                  />
-                </div>
-                <input
-                  type="email"
-                  placeholder="Email Address"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 text-gray-900 placeholder-gray-500 bg-white"
-                />
-                <input
-                  type="tel"
-                  placeholder="Phone Number"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 text-gray-900 placeholder-gray-500 bg-white"
-                />
-                <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 text-gray-900 bg-white">
-                  <option value="" className="text-gray-500">Select Service</option>
-                  <option value="general" className="text-gray-900">General Checkup</option>
-                  <option value="cleaning" className="text-gray-900">Teeth Cleaning</option>
-                  <option value="cosmetic" className="text-gray-900">Cosmetic Dentistry</option>
-                  <option value="orthodontics" className="text-gray-900">Orthodontics</option>
-                  <option value="emergency" className="text-gray-900">Emergency Care</option>
-                </select>
-                <textarea
-                  placeholder="Message (Optional)"
-                  rows="4"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 text-gray-900 placeholder-gray-500 bg-white resize-none"
-                ></textarea>
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-indigo-600 hover:to-blue-600 transition duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                >
-                  Book Appointment
-                </button>
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                {isClient && (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <input name="firstName" value={form.firstName} onChange={handleChange} type="text" placeholder="First Name" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 text-gray-900 placeholder-gray-500 bg-white" />
+                      <input name="lastName" value={form.lastName} onChange={handleChange} type="text" placeholder="Last Name" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 text-gray-900 placeholder-gray-500 bg-white" />
+                    </div>
+                    <input name="email" value={form.email} onChange={handleChange} type="email" placeholder="Email Address" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 text-gray-900 placeholder-gray-500 bg-white" />
+                    <input name="phone" value={form.phone} onChange={handleChange} type="tel" placeholder="Phone Number" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 text-gray-900 placeholder-gray-500 bg-white" />
+                    <select name="service" value={form.service} onChange={handleChange} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 text-gray-900 bg-white">
+                      <option value="" className="text-gray-500">Select Service</option>
+                      <option value="general" className="text-gray-900">General Checkup</option>
+                      <option value="cleaning" className="text-gray-900">Teeth Cleaning</option>
+                      <option value="cosmetic" className="text-gray-900">Cosmetic Dentistry</option>
+                      <option value="orthodontics" className="text-gray-900">Orthodontics</option>
+                      <option value="emergency" className="text-gray-900">Emergency Care</option>
+                    </select>
+                    <textarea name="message" value={form.message} onChange={handleChange} placeholder="Message (Optional)" rows="4" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 text-gray-900 placeholder-gray-500 bg-white resize-none"></textarea>
+                  </>
+                )}
+                <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-indigo-600 hover:to-blue-600 transition duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">Book Appointment</button>
+                {status && <div className="mt-2 text-sm">{status}</div>}
               </form>
             </div>
           </div>
@@ -519,7 +591,7 @@ export default function Home() {
       </section>
 
       {/* Location Map Section */}
-      <section className="py-20 bg-gray-50">
+      <section id="location" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Find Us</h2>
